@@ -49,23 +49,6 @@ def T(y, k):
     return one_hot
 
 
-def compute_gradient(p, y, X, N, lam, W):
-    """
-    Computes derivatives
-    :param p: softmax function
-    :param y: Target vector
-    :param X: Dataset
-    :param N:  number of samples
-    :param lam: lambda
-    :param W: Weight vector
-    :return: dW, db
-    """
-    dW = weight_der(p, y, X, N, lam, W)
-    db = bias_der(p, y, N)
-    gradient_loss = p - y
-    return dW, db
-
-
 def plot_data(X, Y, W, b):
     """
     Plots the decision boundary
@@ -99,64 +82,59 @@ def train(X, y):
     :param y: Target vector
     :return: Loss and accuracy
     """
-    alpha = 1e-4
+    alpha = 0.0001
     N, d = X.shape
+
     k = 3
+    W1 = np.random.random((d, k))
+    W2 = np.random.random((d, k))
+    b1 = np.random.random((1, k))
+    b2 = np.random.random((1, k))
     encode_y = T(y, k)
-    W = np.random.random((d, k))
-    b = np.random.random((1, k))
-    f = np.add(np.dot(X, W), b)
+
     lam = 0.5
     losses = []
+    accs = []
     total_acc = 0
-    maxEpochs = 1500
+    maxEpochs = 8000
+
     for i in range(maxEpochs):
+
+        f1 = np.add(np.dot(X, W1), b1)
+        f2 = np.add(np.dot(X, W2), b2)
+        p1 = softmax(f1)
+        p2 = softmax(f2)
+        print((encode_y - p2).shape, W2.shape)
         accuracy = 0
-        p = softmax(f)
-        cost = J(p, encode_y, W, N, lam)
+        cost = J(p2, encode_y, W2, N, lam)
         losses.append(cost)
-        dW, db = compute_gradient(p, encode_y, X, N, lam, W)
-        W -= alpha * dW
-        b -= alpha * db
+
+        hidden_loss = np.dot((encode_y - p2), W2.T)
+        output_loss = encode_y - p2
+        print(X.T.shape, hidden_loss.shape)
+
+        dW1 = 1 / N * X.T.dot(hidden_loss)
+        dW2 = 1 / N * np.dot(p1.T, output_loss)
+        db1 = 1 / N * np.sum(hidden_loss, axis=0, keepdims=True)
+        db2 = 1 / N * np.sum(output_loss, axis=0, keepdims=True)
+        print(W1.shape, dW1.shape)
+
+        W1 = W1 - alpha * dW1
+        W2 -= alpha * dW2
+        b1 -= alpha * db1
+        b1 = b1 - alpha * db1
+        b2 -= alpha * db2
+
         for j in range(len(X)):
-            if np.argmax(p[j]) == np.argmax(encode_y[j]):
+            if np.argmax(p2[j]) == np.argmax(encode_y[j]):
                 accuracy += 1
         accuracy = accuracy / len(encode_y) * 100
         total_acc += accuracy
+        accs.append(total_acc)
 
-    plot_data(X, encode_y, W, b)
+    plot_data(X, encode_y, W2, b2)
 
-    return losses, total_acc / maxEpochs
-
-
-def weight_der(p, y, X, N, lam, W):
-    """
-   Calculates dj/dW
-   :param p: softmax function
-   :param y: softmax function
-   :param X: dataset
-   :param N: number of samples
-   :param lam: lambda
-   :param W: Weight vector
-   :return: Weight derivative
-   """
-    x = 1 / N * (p - y)
-    dW = X.T.dot(x)
-    dW += lam * W
-    return dW
-
-
-def bias_der(p, y, N):
-    """
-    Calculates dj/db
-    :param p: softmax function
-    :param y: softmax function
-    :param N: number of samples
-    :return: Bias derivative
-    """
-    x = np.sum(p - y, axis=0, keepdims=True)
-    db = x / N
-    return db
+    return losses, total_acc / maxEpochs, accs
 
 
 def predict(X, W, b):
